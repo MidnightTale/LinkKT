@@ -23,6 +23,7 @@ class RespawnAPI() : Listener {
         val task = wrappedScheduler.runTaskTimerAtEntity(player, {
             if (player.isOnline && !player.isDead) {
                 // Player has respawned
+
                 wrappedScheduler.runTaskAsynchronously {
                     instance.server.pluginManager.callEvent(PlayerRespawnEventFolia(player))
                 }
