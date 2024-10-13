@@ -1,0 +1,59 @@
+initialTaskTimer: 20
+playerCheckInterval: 20
+actionBarUpdateInterval: 20
+
+tiers:
+  tier1:
+    playersNearby: 1
+    boosts:
+      movement_speed:
+        mode: attribute
+        attribute: GENERIC_MOVEMENT_SPEED
+        value: 0.1
+        type: percentage
+      luck:
+        mode: attribute
+        attribute: GENERIC_LUCK
+        value: 0.5
+        type: additive
+      attack_damage:
+        mode: attribute
+        attribute: GENERIC_ATTACK_DAMAGE
+        value: 0.05
+        type: percentage
+      armor:
+        mode: attribute
+        attribute: GENERIC_ARMOR
+        value: 1.0
+        type: additive
+  tier2:
+    playersNearby: 2
+    boosts:
+      movement_speed:
+        mode: attribute
+        attribute: GENERIC_MOVEMENT_SPEED
+        value: 0.2
+        type: percentage
+      luck:
+        mode: attribute
+        attribute: GENERIC_LUCK
+        value: 1.0
+        type: additive
+      attack_damage:
+        mode: attribute
+        attribute: GENERIC_ATTACK_DAMAGE
+        value: 0.1
+        type: percentage
+      armor:
+        mode: attribute
+        attribute: GENERIC_ARMOR
+        value: 2.0
+        type: additive
+  tier3:
+    playersNearby: 3
+    boosts:
+      movement_speed:
+        mode: attribute
+        attribute: GENERIC_ARMOR
+        value: 2.0
+        type: additive
