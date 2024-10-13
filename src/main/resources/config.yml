@@ -54,4 +54,6 @@ tiers:
     boosts:
       movement_speed:
         mode: attribute
-        attribute:
+        attribute: GENERIC_ARMOR
+        value: 2.0
+        type: additive
