@@ -6,6 +6,7 @@ import net.hynse.linkKT.util.ActionBarUtil
 import org.bukkit.Bukkit
 
 class ActionBarUpdateTask() : WrappedRunnable() {
+
     override fun run() {
         for (player in Bukkit.getOnlinePlayers()) {
             val nearbyPlayers = playerManager.getNearbyPlayers(player)
