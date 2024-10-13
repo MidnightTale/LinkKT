@@ -1,112 +1,66 @@
 package net.hynse.linkKT.manager
 
 import net.hynse.linkKT.LinkKT.Companion.instance
-import org.bukkit.attribute.Attribute
+import net.hynse.linkKT.LinkKT.Companion.config
+import net.hynse.linkKT.config.Config
 import org.bukkit.attribute.AttributeModifier
-import org.bukkit.entity.Player
 import org.bukkit.NamespacedKey
+import org.bukkit.attribute.Attribute
+import org.bukkit.entity.Player
+import org.bukkit.Particle
 
-class BoostManager() {
-    private val boostKeys = mapOf(
-        Attribute.GENERIC_MOVEMENT_SPEED to listOf(
-            NamespacedKey(instance, "speed_boost_tier_1"),
-            NamespacedKey(instance, "speed_boost_tier_2"),
-            NamespacedKey(instance, "speed_boost_tier_3")
-        ),
-        Attribute.GENERIC_LUCK to listOf(
-            NamespacedKey(instance, "luck_boost_tier_1"),
-            NamespacedKey(instance, "luck_boost_tier_2"),
-            NamespacedKey(instance, "luck_boost_tier_3")
-        ),
-        Attribute.GENERIC_ATTACK_DAMAGE to listOf(
-            NamespacedKey(instance, "attack_damage_boost_tier_1"),
-            NamespacedKey(instance, "attack_damage_boost_tier_2"),
-            NamespacedKey(instance, "attack_damage_boost_tier_3")
-        ),
-        Attribute.GENERIC_ARMOR to listOf(
-            NamespacedKey(instance, "armor_boost_tier_1"),
-            NamespacedKey(instance, "armor_boost_tier_2"),
-            NamespacedKey(instance, "armor_boost_tier_3")
-        )
-    )
+class BoostManager {
+    private val boostPrefix = "linkKT_boost_"
 
     fun applyBoost(player: Player, nearbyPlayerCount: Int) {
-        when (nearbyPlayerCount) {
-            1 -> {
-                applyBoostTier(player, Attribute.GENERIC_MOVEMENT_SPEED, 0, 0.1)  // 10% speed increase
-                applyBoostTier(player, Attribute.GENERIC_LUCK, 0, 0.5)            // +0.5 luck
-                applyBoostTier(player, Attribute.GENERIC_ATTACK_DAMAGE, 0, 0.05)  // 5% attack damage increase
-                applyBoostTier(player, Attribute.GENERIC_ARMOR, 0, 1.0)           // +1 armor
-            }
-            2 -> {
-                applyBoostTier(player, Attribute.GENERIC_MOVEMENT_SPEED, 1, 0.2)  // 20% speed increase
-                applyBoostTier(player, Attribute.GENERIC_LUCK, 1, 1.0)            // +1.0 luck
-                applyBoostTier(player, Attribute.GENERIC_ATTACK_DAMAGE, 1, 0.1)   // 10% attack damage increase
-                applyBoostTier(player, Attribute.GENERIC_ARMOR, 1, 2.0)           // +2 armor
-            }
-            3 -> {
-                applyBoostTier(player, Attribute.GENERIC_MOVEMENT_SPEED, 2, 0.3)  // 30% speed increase
-                applyBoostTier(player, Attribute.GENERIC_LUCK, 2, 1.5)            // +1.5 luck
-                applyBoostTier(player, Attribute.GENERIC_ATTACK_DAMAGE, 2, 0.15)  // 15% attack damage increase
-                applyBoostTier(player, Attribute.GENERIC_ARMOR, 2, 3.0)           // +3 armor
-            }
-            else -> removeAllBoosts(player)
+        val tier = config.tiers.entries.firstOrNull { it.value.playersNearby == nearbyPlayerCount }
+        if (tier != null) {
+            removeAllBoosts(player)
+            applyTierBoosts(player, tier.key, tier.value)
+            spawnTierParticles(player, tier.key)
+        } else {
+            removeAllBoosts(player)
         }
     }
-    /**
-     * Applies a specific tier of boost to a player's attribute.
-     *
-     * @param player The player to whom the boost will be applied.
-     * @param attribute The attribute to be boosted.
-     * @param tier The tier of the boost, used to determine which NamespacedKey to use.
-     * @param boost The value of the boost to be applied.
-     */
-    private fun applyBoostTier(player: Player, attribute: Attribute, tier: Int, boost: Double) {
+
+    private fun applyTierBoosts(player: Player, tierNumber: Int, tierConfig: Config.TierConfig) {
+        tierConfig.boosts.forEach { (boostName, boostConfig) ->
+            when (boostConfig.mode) {
+                "attribute" -> applyAttributeBoost(player, tierNumber, boostName, boostConfig)
+                // Add other boost modes here if needed
+            }
+        }
+    }
+
+    private fun applyAttributeBoost(player: Player, tierNumber: Int, boostName: String, boostConfig: Config.BoostConfig) {
+        val attribute = Attribute.valueOf(boostConfig.attribute ?: return)
         player.getAttribute(attribute)?.let { attributeInstance ->
-            removeBoostsForAttribute(player, attribute)
-
-            val modifier = AttributeModifier(
-                boostKeys[attribute]!![tier],
-                boost,
-                when (attribute) {
-                    Attribute.GENERIC_MOVEMENT_SPEED, Attribute.GENERIC_ATTACK_DAMAGE -> AttributeModifier.Operation.MULTIPLY_SCALAR_1
-                    else -> AttributeModifier.Operation.ADD_NUMBER
-                }
-            )
-            attributeInstance.addModifier(modifier)
-            instance.logger.info("Applied Tier ${tier + 1} ${attribute.name.lowercase()} boost (${formatBoostValue(attribute, boost)}) to player ${player.name}")
-        } ?: run {
-            instance.logger.warning("Failed to apply Tier ${tier + 1} ${attribute.name.lowercase()} boost to player ${player.name}: Attribute not found")
-        }
-    }
-
-    private fun formatBoostValue(attribute: Attribute, boost: Double): String {
-        return when (attribute) {
-            Attribute.GENERIC_MOVEMENT_SPEED, Attribute.GENERIC_ATTACK_DAMAGE -> "${boost * 100}%"
-            else -> "+$boost"
+            val key = NamespacedKey(instance, "$boostPrefix${boostName}_tier_$tierNumber")
+            val operation = when (boostConfig.type) {
+                "percentage" -> AttributeModifier.Operation.MULTIPLY_SCALAR_1
+                else -> AttributeModifier.Operation.ADD_NUMBER
+            }
+            attributeInstance.addModifier(AttributeModifier(key, boostConfig.value, operation))
         }
     }
 
     fun removeAllBoosts(player: Player) {
-        boostKeys.forEach { (attribute, keys) ->
+        Attribute.entries.forEach { attribute ->
             player.getAttribute(attribute)?.let { attributeInstance ->
-                val removedModifiers = attributeInstance.modifiers
-                    .filter { it.key in keys }
-                    .onEach { attributeInstance.removeModifier(it) }
-
-                if (removedModifiers.isNotEmpty()) {
-                    instance.logger.info("Removed ${removedModifiers.size} ${attribute.name.lowercase()} boost(s) from player ${player.name}")
-                }
+                attributeInstance.modifiers
+                    .filter { it.name.startsWith(boostPrefix) }
+                    .forEach { attributeInstance.removeModifier(it) }
             }
         }
     }
 
-    private fun removeBoostsForAttribute(player: Player, attribute: Attribute) {
-        player.getAttribute(attribute)?.let { attributeInstance ->
-            val keys = boostKeys[attribute] ?: return
-            attributeInstance.modifiers
-                .filter { it.key in keys }
-                .forEach { attributeInstance.removeModifier(it) }
+    private fun spawnTierParticles(player: Player, tier: Int) {
+        val world = player.world
+        val location = player.location.add(0.0, 1.0, 0.0)
+        when (tier) {
+            1 -> world.spawnParticle(Particle.HAPPY_VILLAGER, location, 10, 0.5, 0.5, 0.5, 0.1)
+            2 -> world.spawnParticle(Particle.TRIAL_OMEN, location, 15, 0.5, 0.5, 0.5, 0.1)
+            3 -> world.spawnParticle(Particle.END_ROD, location, 20, 0.5, 0.5, 0.5, 0.1)
         }
     }
 }

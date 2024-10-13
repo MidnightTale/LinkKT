@@ -1,46 +1,38 @@
 package net.hynse.linkKT.task
 
-import me.nahu.scheduler.wrapper.runnable.WrappedRunnable
-import net.hynse.linkKT.LinkKT.Companion.boostManager
-import net.hynse.linkKT.LinkKT.Companion.config
 import net.hynse.linkKT.LinkKT.Companion.playerManager
 import net.hynse.linkKT.LinkKT.Companion.wrappedScheduler
+import net.hynse.linkKT.LinkKT.Companion.config
+import net.hynse.linkKT.LinkKT.Companion.boostManager
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
+import me.nahu.scheduler.wrapper.runnable.WrappedRunnable
 
-class PlayerCheckTask() : WrappedRunnable() {
+class PlayerCheckTask : WrappedRunnable() {
+    private val playerTiers = mutableMapOf<Player, Int>()
+
     override fun run() {
-        for (p in Bukkit.getOnlinePlayers()) {
-            val location = p.location
-            wrappedScheduler.runTaskAtLocation(location, Runnable { processPlayer(p) })
+        Bukkit.getOnlinePlayers().forEach { player ->
+            schedulePlayerCheck(player)
         }
     }
 
-    private fun processPlayer(player: Player) {
-        val nearbyPlayers = getNearbyPlayers(player)
-        val nearbyPlayerCount = nearbyPlayers.size
-        val uuid = player.uniqueId
+    private fun schedulePlayerCheck(player: Player) {
+        wrappedScheduler.runTaskAtLocation(player.location) {
+            val nearbyPlayers = player.getNearbyEntities(5.0, 5.0, 5.0)
+                .filterIsInstance<Player>()
+                .filter { it != player }
 
-        val currentCount = playerManager.getPlayerCount(uuid)
-        if (currentCount != nearbyPlayerCount) {
-            playerManager.setPlayerCount(uuid, nearbyPlayerCount)
-            wrappedScheduler.runTaskAtEntity(player, Runnable {
-                if (nearbyPlayerCount == 0) {
-                    // Remove all boosts if there are no nearby players
-                    boostManager.removeAllBoosts(player)
-                } else {
-                    // Apply boost based on the number of nearby players
-                    boostManager.applyBoost(player, nearbyPlayerCount)
-                }
-            })
+            playerManager.setNearbyPlayers(player, nearbyPlayers)
+            playerManager.setPlayerCount(player.uniqueId, nearbyPlayers.size)
+
+            val currentTier = config.tiers.entries.firstOrNull { it.value.playersNearby == nearbyPlayers.size }?.key ?: 0
+            val previousTier = playerTiers.getOrDefault(player, 0)
+
+            if (currentTier != previousTier) {
+                boostManager.applyBoost(player, nearbyPlayers.size)
+                playerTiers[player] = currentTier
+            }
         }
-        playerManager.setNearbyPlayers(player, nearbyPlayers)
-    }
-
-    private fun getNearbyPlayers(player: Player): List<Player> {
-        val radius = config.nearbyRadius.toDouble()
-        return player.getNearbyEntities(radius, radius, radius)
-            .filterIsInstance<Player>()
-            .filter { it != player && it.location.distanceSquared(player.location) <= radius * radius }
     }
 }
