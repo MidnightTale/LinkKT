@@ -1,0 +1,5 @@
+name: LinkKT
+version: '1.0-SNAPSHOT'
+main: net.hynse.linkKT.LinkKT
+api-version: '1.21'
+folia-supported: true
