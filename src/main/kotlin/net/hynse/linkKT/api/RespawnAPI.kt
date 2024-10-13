@@ -7,11 +7,12 @@ import org.bukkit.event.entity.PlayerDeathEvent
 import me.nahu.scheduler.wrapper.task.WrappedTask
 import net.hynse.linkKT.LinkKT.Companion.instance
 import net.hynse.linkKT.LinkKT.Companion.wrappedScheduler
+import org.bukkit.event.EventPriority
 
 class RespawnAPI() : Listener {
     private val respawnTasks = mutableMapOf<String, WrappedTask>()
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.LOWEST)
     fun onPlayerDeath(event: PlayerDeathEvent) {
         val player = event.entity
         val playerName = player.name

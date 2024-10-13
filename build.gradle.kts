@@ -3,6 +3,7 @@ import org.gradle.api.tasks.Copy
 plugins {
     kotlin("jvm") version "2.1.0-Beta1"
     id("com.gradleup.shadow") version "8.3.3"
+    id("xyz.jpenilla.run-paper") version "2.3.1"
 }
 
 group = "net.hynse"
@@ -37,85 +38,129 @@ kotlin {
 }
 
 logger.lifecycle("Kotlin JVM toolchain set to Java $targetJavaVersion")
-
-tasks.shadowJar {
-    archiveClassifier.set("")
-    relocate("com.github.NahuLD", "net.hynse.link.lib")
-    minimize()
-
-    doFirst {
-        logger.lifecycle("Starting ShadowJar task")
-        logger.lifecycle("Relocating 'com.github.NahuLD' to 'net.hynse.link.lib'")
+tasks {
+    jar {
+        manifest {
+            attributes["paperweight-mappings-namespace"] = "mojang"
+        }
     }
+    shadowJar {
+        archiveClassifier.set("")
+        relocate("com.github.NahuLD", "net.hynse.link.lib")
+        minimize()
 
-    doLast {
-        logger.lifecycle("ShadowJar task completed. Output: ${archiveFile.get().asFile.absolutePath}")
-    }
-}
+        doFirst {
+            logger.lifecycle("Starting ShadowJar task")
+            logger.lifecycle("Relocating 'com.github.NahuLD' to 'net.hynse.link.lib'")
+        }
 
-tasks.build {
-    dependsOn(tasks.shadowJar)
-    doFirst {
-        logger.lifecycle("Starting build task")
-    }
-    doLast {
-        logger.lifecycle("Build task completed")
-    }
-}
-
-tasks.processResources {
-    val props = mapOf("version" to version)
-    inputs.properties(props)
-    filteringCharset = "UTF-8"
-    filesMatching("paper-plugin.yml") {
-        expand(props)
-    }
-
-    doFirst {
-        logger.lifecycle("Processing resources")
-        logger.lifecycle("Expanding properties in paper-plugin.yml: $props")
-    }
-
-    doLast {
-        logger.lifecycle("Resource processing completed")
-    }
-}
-
-tasks.register<Copy>("sendToServer") {
-    val destinationDir = file("/mnt/hynse_mc/6_VanillaNGT_Lumional/plugins/")
-    val sourceFile = layout.buildDirectory.file("libs/${project.name}-${project.version}.jar").get().asFile
-    val oldPluginFile = file("${destinationDir}/${project.name}-${project.version}.jar")
-
-    doFirst {
-        logger.lifecycle("Starting sendToServer task")
-        logger.lifecycle("Source file: ${sourceFile.absolutePath}")
-        logger.lifecycle("Destination directory: ${destinationDir.absolutePath}")
-
-        if (oldPluginFile.exists()) {
-            logger.lifecycle("Deleting old plugin file: ${oldPluginFile.absolutePath}")
-            oldPluginFile.delete()
+        doLast {
+            logger.lifecycle("ShadowJar task completed. Output: ${archiveFile.get().asFile.absolutePath}")
+        }
+        manifest {
+            attributes["paperweight-mappings-namespace"] = "mojang"
         }
     }
 
-    from(sourceFile)
-    into(destinationDir)
-
-    doLast {
-        logger.lifecycle("File copied to server: ${destinationDir.resolve(sourceFile.name).absolutePath}")
+    build {
+        dependsOn(shadowJar)
+        doFirst {
+            logger.lifecycle("Starting build task")
+        }
+        doLast {
+            logger.lifecycle("Build task completed")
+        }
     }
-}
 
-tasks.named("sendToServer") {
-    dependsOn("shadowJar")
-    doFirst {
-        logger.lifecycle("sendToServer task depends on shadowJar")
+    processResources {
+        val props = mapOf("version" to version)
+        inputs.properties(props)
+        filteringCharset = "UTF-8"
+        filesMatching("paper-plugin.yml") {
+            expand(props)
+        }
+
+        doFirst {
+            logger.lifecycle("Processing resources")
+            logger.lifecycle("Expanding properties in paper-plugin.yml: $props")
+        }
+
+        doLast {
+            logger.lifecycle("Resource processing completed")
+        }
     }
-}
 
-tasks.named("sendToServer") {
-    dependsOn("build")
-}
+    register<Copy>("sendToServer") {
+        val destinationDir = file("/mnt/hynse_mc/6_VanillaNGT_Lumional/plugins/")
+        val sourceFile = layout.buildDirectory.file("libs/${project.name}-${project.version}.jar").get().asFile
+        val oldPluginFile = file("${destinationDir}/${project.name}-${project.version}.jar")
 
-gradle.taskGraph.whenReady {
-    logger.lifecycle("Task execution order: ${allTasks.joinToString(", ") { it.name }}")
+        doFirst {
+            logger.lifecycle("Starting sendToServer task")
+            logger.lifecycle("Source file: ${sourceFile.absolutePath}")
+            logger.lifecycle("Destination directory: ${destinationDir.absolutePath}")
+
+            if (oldPluginFile.exists()) {
+                logger.lifecycle("Deleting old plugin file: ${oldPluginFile.absolutePath}")
+                oldPluginFile.delete()
+            }
+        }
+
+        from(sourceFile)
+        into(destinationDir)
+
+        doLast {
+            logger.lifecycle("File copied to server: ${destinationDir.resolve(sourceFile.name).absolutePath}")
+        }
+    }
+
+    named("sendToServer") {
+        dependsOn("shadowJar")
+        doFirst {
+            logger.lifecycle("sendToServer task depends on shadowJar")
+        }
+    }
+
+    named("sendToServer") {
+        dependsOn("build")
+    }
+
+    val version = "1.21.1"
+    val javaVersion = JavaLanguageVersion.of(21)
+
+    val jvmArgsExternal = listOf(
+        "-Dcom.mojang.eula.agree=true",
+        "-XX:+AllowEnhancedClassRedefinition",
+        "-XX:HotswapAgent=core"
+    )
+    withType(xyz.jpenilla.runtask.task.AbstractRun::class) {
+        runServer {
+            minecraftVersion(version)
+            runDirectory = rootDir.resolve("run/paper/$version")
+
+            javaLauncher = project.javaToolchains.launcherFor {
+                vendor = JvmVendorSpec.JETBRAINS
+                languageVersion = javaVersion
+            }
+
+            jvmArgs = jvmArgsExternal
+        }
+        runPaper.folia.registerTask {
+            minecraftVersion(version)
+            runDirectory = rootDir.resolve("run/folia/$version")
+            serverJar(rootDir.resolve("run/folia/$version/server.jar"))
+
+            javaLauncher = project.javaToolchains.launcherFor {
+                vendor = JvmVendorSpec.JETBRAINS
+                languageVersion = javaVersion
+            }
+
+            jvmArgs = jvmArgsExternal
+        }
+    }
+
+
+    gradle.taskGraph.whenReady {
+        logger.lifecycle("Task execution order: ${allTasks.joinToString(", ") { it.name }}")
+    }
 }

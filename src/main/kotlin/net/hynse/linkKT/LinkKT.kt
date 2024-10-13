@@ -76,6 +76,25 @@ class LinkKT : FoliaWrappedJavaPlugin() {
         }
     }
 
+    override fun onDisable() {
+        logHeader("LinkKT")
+
+        try {
+            logStep("Clearing Scheduler Tasks") {
+                wrappedScheduler.cancelAllTasks()
+            }
+
+            logStep("Clearing PlayerManager Data") {
+                playerManager.clearData()
+            }
+
+            logFooter("LinkKT has been disabled")
+        } catch (e: Exception) {
+            logError("An error occurred during shutdown", e)
+        }
+    }
+
+
     private fun logStep(component: String, task: () -> Unit) {
         try {
             task()
