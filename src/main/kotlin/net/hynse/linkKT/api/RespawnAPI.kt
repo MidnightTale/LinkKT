@@ -27,8 +27,10 @@ class RespawnAPI() : Listener {
                 wrappedScheduler.runTaskAsynchronously {
                     instance.server.pluginManager.callEvent(PlayerRespawnEventFolia(player))
                 }
+
                 respawnTasks[playerName]?.cancel()
                 respawnTasks.remove(playerName)
+
             }
         }, 1L, 1L)
 
