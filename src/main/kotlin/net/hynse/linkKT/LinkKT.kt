@@ -64,10 +64,10 @@ class LinkKT : FoliaWrappedJavaPlugin() {
                 playerManager.startTasks()
             }
 
-            logStep("RespawnAPI") {
-                respawnAPI = RespawnAPI()
-                server.pluginManager.registerEvents(respawnAPI, this)
-            }
+//            logStep("RespawnAPI") {
+//                respawnAPI = RespawnAPI()
+//                server.pluginManager.registerEvents(respawnAPI, this)
+//            }
 
             logFooter("LinkKT is ready!")
         } catch (e: Exception) {
